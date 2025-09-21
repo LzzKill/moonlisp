@@ -59,7 +59,7 @@ void moonlisp::Parser::getNext()
 Node moonlisp::Parser::parseList()
 {
   this->getNext();
-  auto node = std::make_unique<List>();
+  auto node = std::make_shared<List>();
   while (this->lex->type != _EOF) {
     if (this->isBracket()) { // 只要看是不是 list 或者 pair 即可
       char a = this->lex->word[0];
@@ -86,7 +86,7 @@ Node moonlisp::Parser::parseList()
 
 Node moonlisp::Parser::parsePair()
 { // 只处理 pair
-  auto node = std::make_unique<Pair>();
+  auto node = std::make_shared<Pair>();
   this->getNext();
   while (this->lex->type != _EOF) { // list or pair or end char?
     if (this->isBracket()) {
@@ -115,9 +115,8 @@ Node moonlisp::Parser::parsePair()
 
 Node moonlisp::Parser::parseAtom()
 { // dot
-  if (this->lex->word == ".")
-    return Node{std::make_unique<Atom>(Atom{ast::NodeType::DOT,{}}), this->lex->place};
-  return Node{(std::make_unique<Atom>(Atom{ast::getNodeType(this->lex->type), std::move(this->lex->word)})),
+  if (this->lex->word == ".") return Node{ std::make_shared<Atom>(Atom{ ast::NodeType::DOT, {} }), this->lex->place };
+  return Node{ (std::make_shared<Atom>(Atom{ ast::getNodeType(this->lex->type), std::move(this->lex->word) })),
               this->lex->place};
 }
 

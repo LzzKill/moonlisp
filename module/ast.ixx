@@ -10,7 +10,6 @@
 module;
 #include <memory>
 #include <string>
-#include <utility>
 #include <variant>
 #include <vector>
 
@@ -33,8 +32,7 @@ export namespace moonlisp::ast
   struct Atom;
   struct List;
   struct Pair;
-  using Node_t = std::variant<std::unique_ptr<Atom>, std::unique_ptr<List>,
-                              std::unique_ptr<Pair>>;
+  using Node_t = std::variant<std::shared_ptr<Atom>, std::shared_ptr<List>, std::shared_ptr<Pair>>;
 
   struct Node
   {
