@@ -22,12 +22,12 @@ BraceWrapping:
   AfterControlStatement: true
   AfterEnum: false
   AfterFunction: true
-  AfterNamespace: false
+  AfterNamespace: true
   AfterStruct: false
   AfterUnion: false
   AfterExternBlock: false
   BeforeCatch: false
-  BeforeElse: false
+  BeforeElse: true
   BeforeLambdaBody: false
   BeforeWhile: false
   SplitEmptyFunction: false

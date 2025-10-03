@@ -27,4 +27,8 @@ export namespace moonlisp
   constexpr std::array NEXT_TABLE = {'\n', '\r'};
   constexpr std::array NOTE_TABLE = {';', '#'};
 
+
+  // Define Type
+  using Place = std::array<int, 3>;
+
 } // namespace moonlisp

@@ -42,6 +42,7 @@ std::string_view get_string(moonlisp::LexerType lexer_type)
     return "SYMBOL";
   case moonlisp::_EOF:
     return "_EOF";
+  default: ;
   }
   return "UNKNOWN";
 }
@@ -94,7 +95,7 @@ inline void viewAST(const moonlisp::ast::Node &node, int depth = 0,
         using U = std::decay_t<decltype(arg)>;
         // os << get_string(arg.type) << " ";
         if constexpr (std::is_same_v<U, moonlisp::ast::Atom>) {
-          os << arg.value << "\n";
+          os << get_string(arg.type) << " : " << arg.value << "\n";
         } else if constexpr (std::is_same_v<U, moonlisp::ast::List>) {
           os << "(\n";
           for (const auto &e : arg.elements) {

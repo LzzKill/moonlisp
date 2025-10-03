@@ -32,7 +32,12 @@ export namespace moonlisp::ast
   struct Atom;
   struct List;
   struct Pair;
-  using Node_t = std::variant<std::shared_ptr<Atom>, std::shared_ptr<List>, std::shared_ptr<Pair>>;
+
+  using Atom_p = std::shared_ptr<Atom>;
+  using List_p = std::shared_ptr<List>;
+  using Pair_p = std::shared_ptr<Pair>;
+
+  using Node_t = std::variant<Atom_p, List_p, Pair_p>;
 
   struct Node
   {
