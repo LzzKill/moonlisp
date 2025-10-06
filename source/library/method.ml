@@ -1,0 +1,1 @@
+; equal. (set (quote name) (lambda (arg...) (body) )

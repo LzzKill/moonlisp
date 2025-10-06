@@ -22,19 +22,17 @@ target_sources(${PROJECT_NAME}
   "module/value.ixx"
   "module/builtin.ixx"
   "module/compiler.ixx"
+  "module/vm.ixx"
 )
 
-# Source File
 target_sources(${PROJECT_NAME}
   PRIVATE
-  
   "source/main.cpp")
 
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE
     "/experimental:module"
     "/permissive-"
-    "/ZI"
     "/utf-8"
   )
 

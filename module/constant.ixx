@@ -10,6 +10,7 @@
 module;
 #include <array>
 #include <string_view>
+#include <string>
 export module moonlisp.constant;
 
 export namespace moonlisp
