@@ -11,7 +11,6 @@ module;
 #include <format>
 #include <memory>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -22,6 +21,12 @@ import moonlisp.lexer;
 import moonlisp.constant;
 import moonlisp.exception;
 
+
+using moonlisp::ast::Atom;
+using moonlisp::ast::List;
+using moonlisp::ast::Node;
+
+
 export namespace moonlisp
 {
   class Parser
@@ -30,30 +35,20 @@ export namespace moonlisp
     ast::TopNode node;
     LexerStruct_p lex;
 
-    public:
-    explicit Parser(std::unique_ptr<Lexer> lexer)
-        : lexer(std::move(lexer)), lex(nullptr)
-    {
-      this->parse();
-    };
-    ast::TopNode getAST() { return std::move(this->node); }
-
-    private:
     void parse();
     void getNext();
+    ast::Node parseList(); // 只处理 ()
+    ast::Node parseAtom(); // 解析原子
+    bool isClosingBracket(); // 检查是否是 ')' 或 '.'
 
-    ast::Node parseList();
-    ast::Node parsePair();
-    inline ast::Node parseAtom();
+  public:
+    explicit Parser(std::unique_ptr<Lexer> lexer) : lexer(std::move(lexer)), lex(nullptr) { this->parse(); }
+    ast::TopNode getAST() { return std::move(this->node); }
 
-    bool isBracket();
+
   };
-} // namespace moonlisp
 
-using moonlisp::ast::Atom;
-using moonlisp::ast::List;
-using moonlisp::ast::Node;
-using moonlisp::ast::Pair;
+
 
 void moonlisp::Parser::parse()
 {

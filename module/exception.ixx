@@ -54,4 +54,15 @@ export namespace moonlisp
     CompilerError(const Place &p, const std::string &msg) :
       MoonlispError("CompilerError", p, msg) { }
   };
+
+  class Exit final {
+    int status;
+
+  public:
+    explicit Exit(const int status) :
+      status(status) { }
+
+    [[nodiscard]] int getStatus() const { return this->status; }
+  };
+
 } // namespace moonlisp

@@ -176,26 +176,31 @@ int main()
     const auto &m = compiler->getInstructions();
     for (int i = 0; i < m.size(); ++i)
     {
-      std::cout << i << " : " << printByteCode(m[i].op) << " Args: " << printArgs(m[i].operand) << "\n";
     }
     std::cout << std::flush;
   } catch (const moonlisp::LexerError &e)
   { // 引用自 main.cpp [9]
     e.show();
-    return 1;
   } catch (const moonlisp::ParserError &e)
   { // 引用自 main.cpp [9]
     e.show();
-    return 1;
   } catch (const moonlisp::CompilerError &e)
   {
     e.show();
-    return 1;
   } catch (const std::exception &e)
   { // 引用自 main.cpp [9]
     std::cerr << "未捕获的标准异常: " << e.what() << std::endl;
-    return 1;
-  } catch (...)
+  } catch (const std::runtime_error& e)
+  {
+    std::cerr << "标准运行时错误:" << e.what() << std::endl;
+  }
+  catch (const moonlisp::Exit &e)
+  {
+    const auto& m = e.getStatus();
+    std::cout << "程序结束，退出符号：" << m << std::endl;
+    return m;
+  }
+  catch (...)
   { // 引用自 main.cpp [9]
     std::cerr << "未捕获的未知异常!" << std::endl;
     return 1;
