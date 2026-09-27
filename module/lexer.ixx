@@ -6,13 +6,11 @@
 
 module;
 
-#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 export module moonlisp.lexer;
 

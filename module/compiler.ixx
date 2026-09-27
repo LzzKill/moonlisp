@@ -36,10 +36,13 @@ export namespace moonlisp
     ast::TopNode ast_node;
     Instruction_v instructions;
 
-    inline void emit(const ByteCode opcode) { this->instructions.emplace_back(opcode); }
-    inline void emit(const ByteCode opcode, Operand arg) { this->instructions.emplace_back(opcode, arg); }
+    inline void emit(const ByteCodeVM opcode) { this->instructions.emplace_back(opcode); }
+    inline void emit(const ByteCodeVM opcode, Value_p arg) { this->instructions.emplace_back(opcode, arg); }
 
-    void compiler() { for (const auto &node : ast_node) compileNode(node); }
+    void compiler()
+    {
+      for (const auto &node : ast_node) compileNode(node);
+    }
 
     void compileNode(const ast::Node &);
 
@@ -47,7 +50,7 @@ export namespace moonlisp
 
     void compileList(const ast::Node &);
 
-    void compilePair(const ast::Node &);
+    // void compilePair(const ast::Node &);
 
     void compileQuote(const ast::Node &);
 
@@ -56,11 +59,9 @@ export namespace moonlisp
     void compileLambda(const ast::Node &);
 
   public:
-    explicit Compiler(const std::unique_ptr<Parser> &parser) :
-      ast_node(std::move(parser->getAST())) { compiler(); }
+    explicit Compiler(const std::unique_ptr<Parser> &parser) : ast_node(std::move(parser->getAST())) { compiler(); }
 
-    explicit Compiler(const ast::Node &node) :
-      ast_node({ node }) { compiler(); }
+    explicit Compiler(const ast::TopNode &node) : ast_node(node) { compiler(); }
 
 
     [[nodiscard]] const Instruction_v &getInstructions() const { return instructions; }
@@ -72,14 +73,16 @@ export namespace moonlisp
 
 void moonlisp::Compiler::compileNode(const ast::Node &node)
 {
-  std::visit([&]<typename T0>(const T0 &node_ptr) {
-    using T = std::decay_t<T0>;
+  std::visit(
+      [&]<typename T0>(const T0 &node_ptr) {
+        using T = std::decay_t<T0>;
 
-    if constexpr (std::is_same_v<T, ast::Atom_p>) { this->compileAtom(node); }
-    else if constexpr (std::is_same_v<T, ast::List_p>) { this->compileList(node); }
-    else if constexpr (std::is_same_v<T, ast::Pair_p>) { this->compilePair(node); }
-    else { throw CompilerError(node.place, "Unknown node type"); }
-  }, node.node);
+        if constexpr (std::is_same_v<T, ast::Atom_p>) { this->compileAtom(node); }
+        else if constexpr (std::is_same_v<T, ast::List_p>) { this->compileList(node); }
+        // else if constexpr (std::is_same_v<T, ast::Pair_p>) { this->compilePair(node); }
+        else { throw CompilerError(node.place, "Unknown node type"); }
+      },
+      node.node);
 }
 
 void moonlisp::Compiler::compileAtom(const ast::Node &node)
@@ -89,20 +92,20 @@ void moonlisp::Compiler::compileAtom(const ast::Node &node)
   switch (atom->type)
   {
     case ast::NodeType::NUMBER: {
-      emit(PUSH_VALUE, util::make_number(std::stoi(atom->value)));
+      emit(ByteCodeVM::PUSH_CONST, util::make_number(std::stoi(atom->value)));
       break;
     }
     case ast::NodeType::FLOAT: {
-      emit(PUSH_VALUE, util::make_float(std::stod(atom->value)));
+      emit(ByteCodeVM::PUSH_CONST, util::make_float(std::stod(atom->value)));
       break;
     }
-    case ast::NodeType::STRING: {
-      emit(PUSH_VALUE, atom->value);
+    case ast::NodeType::STRING: /*{
+      emit(ByteCodeVM::PUSH_CONST, util::make_string(atom->value));
       break;
-    }
+    }*/
     case ast::NodeType::NAME: {
       // 推送变量值
-      emit(PUSH_VARIABLE, atom->value);
+      emit(ByteCodeVM::PUSH_VAR, util::make_string(atom->value));
       break;
     }
     default: throw CompilerError(node.place, std::format("Unknown atom type: {}", atom->value));
@@ -138,90 +141,106 @@ void moonlisp::Compiler::compileList(const ast::Node &node)
   }
   if (symbol == "lambda")
   {
-    if (list->elements.size() != 3) { throw CompilerError(node.place, "lambda required argument is 3"); }
+    // lambda 至少要有：lambda 参数列表 体表达式(>=1)
+    if (list->elements.size() < 3)
+
+      throw CompilerError(node.place, "lambda requires at least parameter list and one body expression");
+
     compileLambda(node);
     return;
   }
+
   // 普通函数调用：先编译所有参数，再编译函数，最后调用
   for (size_t i = 1; i < list->elements.size(); ++i) { compileNode(list->elements[i]); }
   compileNode(first);
-  instructions.emplace_back(CALL, list->elements.size() - 1); // 操作数是参数数量
+  instructions.emplace_back(ByteCodeVM::CALL, list->elements.size() - 1); // 操作数是参数数量
 }
 
 void moonlisp::Compiler::compileQuote(const ast::Node &node)
 {
-  std::visit([&]<typename T0>(const T0 &node_ptr) {
-    using T = std::decay_t<T0>;
+  std::visit(
+      [&]<typename T0>(const T0 &node_ptr) {
+        using T = std::decay_t<T0>;
 
-    if constexpr (std::is_same_v<T, ast::Atom_p>)
-    {
-      emit(PUSH_VALUE, node_ptr->value); // [1]
-    }
-    else if constexpr (std::is_same_v<T, ast::List_p>)
-    {
-      // 对于列表，递归编译所有元素，然后创建列表
-      const auto &list = *node_ptr;
-      size_t element_count = list.elements.size();
+        if constexpr (std::is_same_v<T, ast::Atom_p>)
 
-      // 从后往前编译，以便在栈上形成正确的顺序供 MAKE_LIST 使用
-      for (auto it = list.elements.rbegin(); it != list.elements.rend(); ++it) compileQuote(*it); // 递归处理每个元素
-      emit(MAKE_LIST, element_count);
-    }
-    else if constexpr (std::is_same_v<T, ast::Pair_p>)
-    {
-      // 对于Pair的处理，类似列表
-      const auto &pair = *node_ptr;
-      size_t element_count = pair.elements.size();
+          emit(ByteCodeVM::MAKE_SYMBOL, util::make_string(node_ptr->value)); // [1]
 
-      // 从后往前编译
-      for (auto it = pair.elements.rbegin(); it != pair.elements.rend(); ++it)
-        compileQuote(*it); // 递归处理每个元素
+        // else if constexpr (std::is_same_v<T, ast::List_p>) // NOTE: lisp允许quote后跟S表达式，但这里临时忽略
+        //{
+        //   // 对于列表，递归编译所有元素，然后创建列表
+        //   const auto &list = *node_ptr;
+        //   size_t element_count = list.elements.size();
 
-      instructions.emplace_back(MAKE_PAIR, element_count);
-    }
-    else
-      static_assert("Unknown");
-  }, node.node);
+        //  // 从后往前编译，以便在栈上形成正确的顺序供 MAKE_LIST 使用
+        //  for (auto it = list.elements.rbegin(); it != list.elements.rend(); ++it) compileQuote(*it); //
+        //  递归处理每个元素 emit(MAKE_LIST, element_count);
+        //}
+        // else if constexpr (std::is_same_v<T, ast::Pair_p>)
+        //{
+        //  // 对于Pair的处理，类似列表
+        //  const auto &pair = *node_ptr;
+        //  size_t element_count = pair.elements.size();
+
+        //  // 从后往前编译
+        //  for (auto it = pair.elements.rbegin(); it != pair.elements.rend(); ++it)
+        //    compileQuote(*it); // 递归处理每个元素
+
+        //  instructions.emplace_back(MAKE_PAIR, element_count);
+        //}
+        else
+          static_assert("Unknown");
+      },
+      node.node);
 }
 
 void moonlisp::Compiler::compileIf(const ast::Node &node)
 {
+  // (if cond true [false])
   const auto &list = std::get<ast::List_p>(node.node);
-  compileNode(list->elements[1]); // cond.
 
-  auto else_jump_pos = instructions.size();
-  instructions.emplace_back(JUMP_IF_FALSE, else_jump_pos);
+  // 编译条件
+  compileNode(list->elements[1]);
 
-  compileNode(list->elements[2]); // true
+  // 1. 生成 JUMP_IF_FALSE，占位，暂不填地址
+  size_t jumpIfFalseIdx = instructions.size();
+  instructions.emplace_back(ByteCodeVM::JUMP_IF_FALSE, 0);
 
-  // 生成跳转到结尾的指令
-  auto end_jump_pos = instructions.size();
-  instructions.emplace_back(JUMP, end_jump_pos);
+  // 编译true分支
+  compileNode(list->elements[2]);
 
-  // 填充else分支的跳转目标
-  instructions[else_jump_pos].operand = instructions.size();
+  // 2. 生成true分支结束后的无条件跳转，占位
+  size_t jumpPastElseIdx = instructions.size();
+  instructions.emplace_back(ByteCodeVM::JUMP, 0);
 
-  // 编译else分支（如果存在）
-  if (list->elements.size() > 3) { compileNode(list->elements[3]); }
+  // 此时，else分支的起点就是现在的instructions.size()
+  size_t elseStart = instructions.size();
+  instructions[jumpIfFalseIdx].operand->data = static_cast<int>(elseStart);
 
-  // 填充结尾跳转的目标
-  instructions[end_jump_pos].operand = instructions.size();
+  // 编译else分支（可选）
+  if (list->elements.size() == 4) { compileNode(list->elements[3]); }
+
+  // if整体结束位置
+  size_t ifEnd = instructions.size();
+  instructions[jumpPastElseIdx].operand->data = static_cast<int>(ifEnd);
 }
 
-// 在 moonlisp::Compiler 类中
-void moonlisp::Compiler::compilePair(const ast::Node &node)
-{
-  const auto &pair_ast = *std::get<ast::Pair_p>(node.node);
-  for (const auto &elem : pair_ast.elements) { compileNode(elem); }
-  emit(MAKE_PAIR, pair_ast.elements.size()); // 如果是空的，自然会push 0
-}
+
+//// 在 moonlisp::Compiler 类中
+// void moonlisp::Compiler::compilePair(const ast::Node &node)
+//{
+//   const auto &pair_ast = *std::get<ast::Pair_p>(node.node);
+//   for (const auto &elem : pair_ast.elements) { compileNode(elem); }
+//   emit(MAKE_PAIR, pair_ast.elements.size()); // 如果是空的，自然会push 0
+// }
 
 void moonlisp::Compiler::compileLambda(const ast::Node &lambda_node)
 {
   const auto &list_node = *std::get<ast::List_p>(lambda_node.node);
-
-  const auto &params_node = list_node.elements[1]; // 参数列表 AST 节点
-  const auto &body_node = list_node.elements[2];
+  const auto &params_node = list_node.elements[1];
+  // body 是 elements[2] 直到末尾所有节点，隐式progn
+  ast::TopNode body_ast;
+  for (size_t i = 2; i < list_node.elements.size(); i++) { body_ast.push_back(list_node.elements[i]); }
 
   std::vector<std::string> param_names;
   if (std::holds_alternative<ast::List_p>(params_node.node))
@@ -232,25 +251,20 @@ void moonlisp::Compiler::compileLambda(const ast::Node &lambda_node)
       if (std::holds_alternative<ast::Atom_p>(param_elem.node))
       {
         const auto &atom = *std::get<ast::Atom_p>(param_elem.node);
-        if (atom.type == ast::NodeType::NAME)
-        {
-          param_names.push_back(atom.value); // 参数必须是List，List中必须包含NAME项，别的都不行
-        }
-        else { throw CompilerError(param_elem.place, "lambda parameters must be symbols"); }
+        if (atom.type == ast::NodeType::NAME) { param_names.push_back(atom.value); }
+        else { throw CompilerError(param_elem.place, "lambda parameters must be symbol names"); }
       }
       else { throw CompilerError(param_elem.place, "lambda parameters must be symbols"); }
     }
   }
   else { throw CompilerError(params_node.place, "lambda parameters must be a list"); }
 
-  // 编译 lambda结构体，使用新的 Compiler 实例
+  // 子编译器编译整个body序列（多个表达式，隐式progn）
+  Compiler body_compiler(body_ast);
+  auto body_byte = body_compiler.getInstructions();
+  body_byte.emplace_back(ByteCodeVM::RETURN);
 
-  auto t_compiler = Compiler(body_node); // 不使用指针分配
-  auto byte = t_compiler.getInstructions();
-  byte.emplace_back(RETURN); // 添加末尾指令
-  /*
-   * 此处实现争议较大。
-   * 我选择直接push编译好的lambda实例，VM知道如何处理env
-   */
-  emit(PUSH_LAMBDA, util::make_lambda(nullptr, param_names, byte)); // 留空env
+  // 构造lambda值，env=nullptr，运行时PUSH_LAMBDA捕获当前env
+  auto lam_val = util::make_lambda(nullptr, std::move(param_names), std::move(body_byte));
+  emit(ByteCodeVM::PUSH_LAMBDA, lam_val);
 }

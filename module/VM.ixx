@@ -12,6 +12,7 @@ module;
 #include <optional>
 #include <stack>
 #include <stdexcept>
+
 export module moonlisp.vm;
 
 import moonlisp.value;
@@ -19,12 +20,15 @@ import moonlisp.compiler;
 import moonlisp.constant;
 import moonlisp.exception;
 import moonlisp.builtin;
+
 namespace moonlisp
 {
+  // VM ByteCode
+
   class VM {
     Instruction_v instructions;
     std::stack<Value_p> stack;
-    Env_p env;
+    Env_p env_root, env_current;
 
     void pop();
     void pushValue(const Instruction &m);

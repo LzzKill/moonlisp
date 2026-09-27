@@ -106,7 +106,7 @@ inline void viewAST(const moonlisp::ast::Node &node, int depth = 0,
       node.node);
 }
 
-std::string_view printByteCode(moonlisp::ByteCode code)
+std::string_view printByteCode(moonlisp::ByteCodeVM code)
 {
   switch (code)
   {
